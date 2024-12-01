@@ -1,0 +1,248 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // For formatting dates
+
+void main() {
+  runApp(HabitTrackerApp());
+}
+
+class HabitTrackerApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Habit Tracker',
+      theme: ThemeData(primarySwatch: Colors.teal),
+      home: HabitTrackerPage(),
+    );
+  }
+}
+
+class HabitTrackerPage extends StatefulWidget {
+  @override
+  _HabitTrackerPageState createState() => _HabitTrackerPageState();
+}
+
+class _HabitTrackerPageState extends State<HabitTrackerPage> {
+  final List<Map<String, dynamic>> _habits = [];
+  final TextEditingController _habitController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
+  String _selectedPriority = 'Low'; // Default priority
+  DateTime? _selectedDueDate;
+
+  void _addHabit(String habitName, String priority, String notes, DateTime? dueDate) {
+    if (habitName.isNotEmpty) {
+      setState(() {
+        _habits.add({
+          'name': habitName,
+          'completed': false,
+          'priority': priority,
+          'notes': notes,
+          'dueDate': dueDate,
+        });
+      });
+      _habitController.clear();
+      _noteController.clear();
+      _selectedDueDate = null;
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _toggleHabitCompletion(int index) {
+    setState(() {
+      _habits[index]['completed'] = !_habits[index]['completed'];
+    });
+  }
+
+  void _deleteHabit(int index) {
+    setState(() {
+      _habits.removeAt(index);
+    });
+  }
+
+  void _resetHabits() {
+    setState(() {
+      for (var habit in _habits) {
+        habit['completed'] = false;
+      }
+    });
+  }
+
+  void _showAddHabitDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Habit'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _habitController,
+              decoration: InputDecoration(hintText: 'Enter habit name'),
+            ),
+            DropdownButton<String>(
+              value: _selectedPriority,
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedPriority = newValue!;
+                });
+              },
+              items: <String>['Low', 'Medium', 'High']
+                  .map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+            ),
+            TextField(
+              controller: _noteController,
+              decoration: InputDecoration(hintText: 'Enter notes (optional)'),
+            ),
+            GestureDetector(
+              onTap: () => _selectDueDate(context),
+              child: Row(
+                children: [
+                  Text(
+                    _selectedDueDate == null
+                        ? 'Select Due Date'
+                        : DateFormat.yMMMd().format(_selectedDueDate!),
+                    style: TextStyle(color: Colors.blue),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              _addHabit(_habitController.text, _selectedPriority, _noteController.text, _selectedDueDate);
+            },
+            child: Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _selectDueDate(BuildContext context) async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (pickedDate != null && pickedDate != _selectedDueDate) {
+      setState(() {
+        _selectedDueDate = pickedDate;
+      });
+    }
+  }
+
+  int get _completedCount {
+    return _habits.where((habit) => habit['completed'] == true).length;
+  }
+
+  List<Map<String, dynamic>> get _sortedHabits {
+    return List.from(_habits)..sort((a, b) {
+      return a['priority'].compareTo(b['priority']);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Habit Tracker'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: _resetHabits,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              'Habits Completed: $_completedCount / ${_habits.length}',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          _habits.isEmpty
+              ? Center(
+                  child: Text(
+                    'No habits added. Start tracking!',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                )
+              : Expanded(
+                  child: ListView.builder(
+                    itemCount: _sortedHabits.length,
+                    itemBuilder: (context, index) {
+                      final habit = _sortedHabits[index];
+                      return ListTile(
+                        title: Text(
+                          habit['name'],
+                          style: TextStyle(
+                            decoration: habit['completed']
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Priority: ${habit['priority']}',
+                              style: TextStyle(
+                                color: habit['priority'] == 'High'
+                                    ? Colors.red
+                                    : habit['priority'] == 'Medium'
+                                        ? Colors.orange
+                                        : Colors.green,
+                              ),
+                            ),
+                            if (habit['dueDate'] != null)
+                              Text('Due: ${DateFormat.yMMMd().format(habit['dueDate'])}'),
+                            if (habit['notes'] != null && habit['notes'].isNotEmpty)
+                              Text('Notes: ${habit['notes']}'),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: habit['completed'],
+                              onChanged: (value) {
+                                _toggleHabitCompletion(index);
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete),
+                              onPressed: () {
+                                _deleteHabit(index);
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddHabitDialog,
+        child: Icon(Icons.add),
+      ),
+    );
+  }
+}
